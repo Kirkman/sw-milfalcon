@@ -72,7 +72,7 @@ function joshSprite( frame, path ) {
 	if ( frame !== undefined ) {
 		this.frame = frame;
 	}
-	if ( frame !== undefined ) {
+	if ( path !== undefined ) {
 		this.path = path;
 	}
 	else {
@@ -125,9 +125,13 @@ joshSprite.prototype = {
 		}
 		this.index -= amt;
 	},
-	changeState: function(n) {
+	changeBearing: function(n) {
 		var spriteHeight = this.frame.height;
 		this.frame.scrollTo(0 , n*spriteHeight );
+	},
+	changePosition: function(n) {
+		var spriteWidth = this.frame.width;
+		this.frame.scrollTo(n*spriteWidth, 0 );
 	},
 	isOnStage: function() {
 		var screen_rows = console.screen_rows;
@@ -229,10 +233,10 @@ function makeBg() {
 
 	// falcon sprite has two states: engine dark or engine lit
 	falconSprite.accelerate = function() {
-		this.changeState(1);
+		this.changeBearing(1);
 	}
 	falconSprite.decelerate = function() {
-		this.changeState(0);
+		this.changeBearing(0);
 	}
 	// Load the sprite's animation path
 	falconSprite.setPath( getJson( 'falcon.json' )['path'] );
