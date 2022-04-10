@@ -1,6 +1,7 @@
 load("sbbsdefs.js");
 load("frame.js");
 load("sprite.js");
+load("frame-extensions.js"); // Josh's extra frame stuff, eg: .scrollCircular() method
 load(js.exec_dir + "frame-transitions.js");
 
 // GLOBAL FRAME VARIABLES
@@ -10,6 +11,7 @@ var msgFrame, msgMode = false;
 var falconSprite, astSprite1, astSprite2, astSpriteBig, astSpriteMega;
 var bgFrameArray = [], spriteFrameArray = [];
 var canvasFrame;
+var drawTimes = [];
 
 // ANIMATION CODES
 var delayHalfSec = ';';
@@ -304,7 +306,7 @@ function makeBg() {
 
 	// MESSAGE / INFO FRAME
 	if (msgMode) {
-		msgFrame = new Frame(48,20,32,2,BG_BLACK|WHITE,bgFrame);
+		msgFrame = new Frame(10,20,70,2,BG_BLACK|WHITE,bgFrame);
 		msgFrame.draw();
 	}
 
@@ -380,7 +382,19 @@ function play() {
 							bgFrame.screenShot(js.exec_dir + "/screenshots/debug-" + frStr + "-bgFrame.bin", false);
 							canvasFrame.screenShot(js.exec_dir + "/screenshots/debug-" + frStr + "-canvasFrame.bin", false);
 						}
-						// Unpause handler: any key other than D
+						else if (key == 'M') {
+							if (msgMode == false) {
+								msgFrame = new Frame(20,20,40,2,BG_BLACK|WHITE,bgFrame);
+								msgFrame.draw();
+								msgMode = true;
+							}
+							else { 
+								msgFrame.close();
+								msgFrame.delete();
+								msgMode = false; 
+							}
+						}
+						// Unpause handler: any key other than D or M
 						else {
 							gotkey = true;
 						}
@@ -617,20 +631,6 @@ function play() {
 		// Record what time we finished drawing
 		var endFrameDraw = system.timer;
 
-		// Output debugging information if msgMode switch is set
-		if (msgMode) {
-			msgFrame.clear();
-			msgFrame.close();
-			msgFrame.open();
-			msgFrame.putmsg('frame num: ' + fr );
-			if ( falconSprite.getIndex() ) {
-				msgFrame.putmsg(' | Falcon idx: ' + falconSprite.getIndex() );
-			}
-			msgFrame.crlf();
-			msgFrame.putmsg('DrawTime: ' + (endFrameDraw - beginFrameDraw) );
-		}
-
-
 
 
 		// increment beat counter
@@ -657,6 +657,24 @@ function play() {
  		if ( drawTime < 0.08 ) {
 			mswait( (0.08-drawTime)*1000 );
  		};
+
+ 		// Update DrawTimes queue
+ 		drawTimes.push({'b':beginFrameDraw, 'e': endFrameDraw, 't': drawTime});
+ 		if (drawTimes.length > 5) { drawTimes.shift(); }
+ 		var fps = drawTimes.length / (drawTimes[drawTimes.length-1].e - drawTimes[0].b);
+
+		// Output debugging information if msgMode switch is set
+		if (msgMode) {
+			msgFrame.clear();
+			msgFrame.close();
+			msgFrame.open();
+			msgFrame.putmsg('frame num: ' + fr );
+			if ( falconSprite.getIndex() ) {
+				msgFrame.putmsg(' | Falcon idx: ' + falconSprite.getIndex() );
+			}
+			msgFrame.crlf();
+			msgFrame.putmsg('FPS: ' + fps.toFixed(1) + ' | DrawTime: ' + drawTime.toFixed(3) );
+		}
 
 
 
