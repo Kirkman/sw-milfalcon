@@ -19,16 +19,24 @@ var delayHalfSec = ';';
 var delayTwoSecs = '.';
 
 // COLOR CODES
+var lowBlue = 'NB0';
+var highBlue = 'HB0';
+
 var lowWhite = 'NW0';
 var highWhite = 'HW0';
+
 var lowCyan = 'NC0';
 var highCyan = 'HC0';
+
+var lowBlack = 'NK0';
 var highBlack = 'HK0';
+
 var highYellowDarkBlue = 'HY4';
 var highWhiteDarkCyan = 'HW6';
 
 // DEBUGGING OPTIONS
 var debugOn = false;
+var screenShot = false;
 
 
 // Compare a canvas frame against data in another frame. Repaint characters that are different.
@@ -337,18 +345,18 @@ function play() {
 	msgMode = false;
 	// screenshot counter
 	var ss = 0;
-	// screenshot switch. Change this to false to disable.
-	var screenShot = false;
 	// main animation
 	var fr = 0;
-	var numFrames = 352; // This is inclusive of WipeFrLen and numCreditsFrames.
+	// opening title screen
+	var numTitleFrames = 96;
+	// main animation only
+	var numMainFrames = 236;
+	// end wipe transition
 	var pixelArray = [];
 	// Best wipeSizes are evenly divisible into 80: 1, 2, 4, 5, 8, 10
 	var wipeSize = 6;
 	var wipeGradientStep = parseInt( (yl-2) / wipeSize );
 	var wipeFrLen = parseInt( xl / wipeSize );
-	// opening title screen
-	var numTitleFrames = 96;
 	// end credits screen
 	var endCredits = {
 		framesPerCredit: null,
@@ -359,30 +367,88 @@ function play() {
 				// In this object, the number of frames for this credit
 				// can be longer than the number of colors. The script
 				// will hold on the final color until the frames run out.
-				numFrames: 10,
+				numFrames: 27,
 				colors: [
-					highBlack,
+					lowBlue,
+					highBlue,
 					lowCyan,
-					highCyan
+					highCyan,
+					highCyan,
+					highCyan,
+					highCyan,
+					highCyan,
+					highCyan,
+					highCyan,
+					highCyan,
+					highCyan,
+					highCyan,
+					highCyan,
+					highCyan,
+					highCyan,
+					highCyan,
+					lowCyan,
+					highBlue,
+					lowBlue,
+					lowBlack,
+					lowBlack,
+					lowBlack,
+					lowBlack,
+					lowBlack,
+					lowBlack,
+					lowBlack
 				]
 			},
 			{
 				title: 'Directed by',
 				name: 'KIRKMAN',
-				numFrames: 20, // Hold a little longer
+				numFrames: 21, // Hold a little longer
 				colors: [
-					highBlack,
+					lowBlue,
+					highBlue,
 					lowCyan,
-					highCyan
+					highCyan,
+					highCyan,
+					highCyan,
+					highCyan,
+					highCyan,
+					highCyan,
+					highCyan,
+					highCyan,
+					highCyan,
+					highCyan,
+					highCyan,
+					highCyan,
+					highCyan,
+					highCyan,
+					lowCyan,
+					highBlue,
+					lowBlue,
+					lowBlack
 				]
 			}
 		]
 	};
+	// Calculate total number of frames we need for all the credits.
 	var numCreditsFrames = endCredits.data.reduce(function(sum, c) {
 		return sum + c.numFrames;
 	}, 0);
 
+	// Total inclusive number of frames
+	var numFrames = numTitleFrames + numMainFrames + wipeFrLen + numCreditsFrames;
+
+	// Frame number for start of credits
 	var endCreditsStart = (numFrames - numCreditsFrames);
+
+
+
+	if (debugOn == true) {
+		debug( 'fr: ' + fr );
+		debug( 'numFrames: ' + numFrames );
+		debug( 'wipeSize: ' + wipeSize );
+		debug( 'wipeGradientStep: ' + wipeGradientStep );
+		debug( 'wipeFrLen: ' + wipeFrLen );
+		debug( 'numTitleFrames: ' + numTitleFrames );
+	}
 
 
 	// ====================================================
@@ -681,7 +747,7 @@ function play() {
 		// be better to use actual .BIN files similar to the opening titles
 		// in my other ansimations.
 
-		if (fr >= endCreditsStart ) {
+		if (fr >= endCreditsStart) {
 			if (debugOn == true) {
 				debug( 'Section: fr >= endCreditsStart. End Credits.');
 			}
@@ -737,8 +803,8 @@ function play() {
 			// Determine which frame we're in relative to this specific credit.
 			// We need this to grab the color from this credit's color table.
 			var curCreditFrame = curEndFrame - breakpoints[curCredit];
-			// The number of frames per credit will be higher than the number of colors we cycle through.
-			// If we've already cycled through all colors, just hold at the final color until the end of the frame.
+			// It's optionally possible to specify just a couple colors, less than the number of frames per credit.
+			// In that case, if we've already cycled thru all colors, we'll hold at the final color until the credit finishes.
 			if (curCreditFrame >= endCredits.data[curCredit].colors.length) {
 				curCreditFrame = endCredits.data[curCredit].colors.length - 1;
 			}
@@ -768,6 +834,9 @@ function play() {
 		repaintCanvas( bgFrame, canvasFrame );
 		canvasFrame.cycle();
 
+		// if (debugOn && fr >= endCreditsStart) {
+		// 	debugFrame( canvasFrame );
+		// }
 
 		// Record what time we finished drawing
 		var endFrameDraw = system.timer;
@@ -841,7 +910,8 @@ function cleanup() {
 		astSpriteBig.frame,
 		astSprite1.frame,
 		astSprite2.frame,
-		fgFrame
+		fgFrame,
+		canvasFrame
 	];
 
 	for (var af=0; af < allFrames.length; af++ ) {
