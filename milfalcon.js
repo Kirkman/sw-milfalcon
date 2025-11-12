@@ -1,7 +1,8 @@
 load("sbbsdefs.js");
 load("frame.js");
 load("sprite.js");
-load("frame-extensions.js"); // Josh's extra frame stuff, eg: .scrollCircular() method
+load("frame-extensions.js"); // Josh's extra frame stuff, e.g.: .scrollCircular() method
+load("helper-functions.js"); // Josh's extra helper stuff, e.g. debug() method
 load(js.exec_dir + "frame-transitions.js");
 
 // GLOBAL FRAME VARIABLES
@@ -26,6 +27,8 @@ var highBlack = 'HK0';
 var highYellowDarkBlue = 'HY4';
 var highWhiteDarkCyan = 'HW6';
 
+// DEBUGGING OPTIONS
+var debugOn = false;
 
 
 // Compare a canvas frame against data in another frame. Repaint characters that are different.
@@ -338,7 +341,7 @@ function play() {
 	var screenShot = false;
 	// main animation
 	var fr = 0;
-	var numFrames = 332;
+	var numFrames = 352; // This is inclusive of WipeFrLen and numCreditsFrames.
 	var pixelArray = [];
 	// Best wipeSizes are evenly divisible into 80: 1, 2, 4, 5, 8, 10
 	var wipeSize = 6;
@@ -347,8 +350,40 @@ function play() {
 	// opening title screen
 	var numTitleFrames = 96;
 	// end credits screen
-	var creditsFr = 0;
-	var numCreditsFrames = 8;
+	var endCredits = {
+		framesPerCredit: null,
+		data: [
+			{
+				title: 'For',
+				name: 'RON',
+				// In this object, the number of frames for this credit
+				// can be longer than the number of colors. The script
+				// will hold on the final color until the frames run out.
+				numFrames: 10,
+				colors: [
+					highBlack,
+					lowCyan,
+					highCyan
+				]
+			},
+			{
+				title: 'Directed by',
+				name: 'KIRKMAN',
+				numFrames: 20, // Hold a little longer
+				colors: [
+					highBlack,
+					lowCyan,
+					highCyan
+				]
+			}
+		]
+	};
+	var numCreditsFrames = endCredits.data.reduce(function(sum, c) {
+		return sum + c.numFrames;
+	}, 0);
+
+	var endCreditsStart = (numFrames - numCreditsFrames);
+
 
 	// ====================================================
 	// MILLENNIUM FALCON ANIMATION (with wipe outtro)
@@ -357,6 +392,10 @@ function play() {
 	for ( fr=0; fr<numFrames; fr++ ) {
 		// Record what time we began the loop
 		var beginFrameDraw = system.timer;
+
+		if (debugOn == true) {
+			debug( '\n\nFrame: ' + fr );
+		}
 
 		// CHECK FOR USER INPUT DURING ANIMATION
 		var gotkey = false;
@@ -457,6 +496,10 @@ function play() {
 			// - - - - - - - - - - - - - - - - - - - - -
 
 			if ( fr < numTitleFrames ) {
+				if (debugOn == true) {
+					debug( 'Section: fr < numTitleFrames');
+				}
+
 				if ( fr == 16 ) {
 					fgFrame.load(js.exec_dir + '/graphics/message-begin-1a.bin', 80, 24);
 					maskFrame( fgFrame, ascii(219), LIGHTMAGENTA );
@@ -517,6 +560,9 @@ function play() {
 			}
 			// close fg frame for start of animation
 			if ( fr == numTitleFrames ) {
+				if (debugOn == true) {
+					debug( 'Section: fr == numTitleFrames. Close fg frame, and start animation');
+				}
 				fgFrame.close();
 			}
 
@@ -526,6 +572,10 @@ function play() {
 			// - - - - - - - - - - - - - - - - - - - - -
 
 			if ( fr > numTitleFrames ) {
+				if (debugOn == true) {
+					debug( 'Section: fr > numTitleFrames. Main sprite animation section');
+				}
+
 				for (var f=0; f<spriteFrameArray.length; f++) {
 					// The move function contains logic for checking
 					// if the sprite is onstage or not, and whether to
@@ -574,7 +624,10 @@ function play() {
 		// ENDING WIPE
 		// - - - - - - - - - - - - - - - - - - - - -
 
-		if (fr >= (numFrames - wipeFrLen) - 1 ) {
+		if (fr >= (numFrames - wipeFrLen - numCreditsFrames) - 1 ) {
+			if (debugOn == true) {
+				debug( 'Section: fr >= (numFrames - wipeFrLen - numCreditsFrames) - 1.  Ending wipe.');
+			}
 
 			if ( !fgFrame.is_open ) {
 				fgFrame.load(js.exec_dir + '/graphics/mask-frame-80x24.bin', 80, 24);
@@ -617,6 +670,94 @@ function play() {
 
 		}
 
+		// - - - - - - - - - - - - - - - - - - - - -
+		// END CREDITS
+		// - - - - - - - - - - - - - - - - - - - - -
+
+		// I have redone this so that the credits are implemented within
+		// the main frame counter system. This makes it possible to
+		// correctly screenshot the credits. However it's a bit convoluted.
+		// In the future, instead of using a dynamic object, maybe it'd
+		// be better to use actual .BIN files similar to the opening titles
+		// in my other ansimations.
+
+		if (fr >= endCreditsStart ) {
+			if (debugOn == true) {
+				debug( 'Section: fr >= endCreditsStart. End Credits.');
+			}
+
+			// Close background frames if they are open.
+			if ( !bgFrame1.is_open ) {
+				var framesToClose = [
+					bgFrame1,
+					bgFrame2,
+					bgFrame3,
+					falconSprite.frame,
+				];
+				for (var ftc=0; ftc<framesToClose.length; ftc++) {
+					framesToClose[ftc].close();
+					framesToClose[ftc].delete();
+				}
+			}
+
+			// Figure out where we are in the credits.
+
+			// Find the relative frame (within the context of the credits)
+			// e.g. overall frame 322 is credits frame 0.
+			var curEndFrame = fr - endCreditsStart;
+
+			// Calculate the breakpoints (e.g. [0, 10, 30])
+			// of each individual credit.
+			var breakpoints = [0];
+			for (var i=0; i<endCredits.data.length; i++) {
+				breakpoints.push( endCredits.data[i].numFrames + breakpoints[i] );
+			}
+
+			// Determine which credit we're in, by comparing to the breakpoints.
+			var curCredit = -1;
+			for (var i=0; i<breakpoints.length; i++) {
+				if (i == breakpoints.length - 1) {
+					curCredit = i;
+					break;
+				}
+				if (curEndFrame >= breakpoints[i] && curEndFrame < breakpoints[i+1]) {
+					curCredit = i;
+					break;
+				}
+			}
+
+			if (debugOn == true) {
+				debug( 'endCreditsStart:' + endCreditsStart );
+				debug( 'curEndFrame:' + curEndFrame );
+				debug( 'breakpoints:' + breakpoints );
+				debug( 'curCredit:' + curCredit );
+				debug( 'endCredits.data[curCredit].numFrames:' + endCredits.data[curCredit].numFrames );
+			}
+
+			// Determine which frame we're in relative to this specific credit.
+			// We need this to grab the color from this credit's color table.
+			var curCreditFrame = curEndFrame - breakpoints[curCredit];
+			// The number of frames per credit will be higher than the number of colors we cycle through.
+			// If we've already cycled through all colors, just hold at the final color until the end of the frame.
+			if (curCreditFrame >= endCredits.data[curCredit].colors.length) {
+				curCreditFrame = endCredits.data[curCredit].colors.length - 1;
+			}
+
+			if (debugOn == true) {
+				debug( 'curCreditFrame:' + curCreditFrame );
+				debug( 'endCredits.colors.length:' + endCredits.data[curCredit].colors.length );
+				debug( 'endCredits.data[curCredit].colors[curCreditFrame]:' + endCredits.data[curCredit].colors[curCreditFrame] );
+			}
+
+			// Display the credit
+			fgFrame.gotoxy(0,11);
+			fgFrame.center( endCredits.data[curCredit].colors[curCreditFrame] + endCredits.data[curCredit].title );
+			fgFrame.crlf();
+			fgFrame.center( endCredits.data[curCredit].colors[curCreditFrame] + endCredits.data[curCredit].name );
+			fgFrame.crlf();
+
+		}
+
 
 		// - - - - - - - - - - - - - - - - - - - - -
 		// RENDER EVERYTHING TO SCREEN
@@ -630,8 +771,6 @@ function play() {
 
 		// Record what time we finished drawing
 		var endFrameDraw = system.timer;
-
-
 
 		// increment beat counter
 		beat++;
@@ -658,6 +797,12 @@ function play() {
 			mswait( (0.08-drawTime)*1000 );
  		};
 
+ 		// // ALTERNATIVE TO MSWAIT IS TO OUTPUT A BUNCH OF ANSI BACK-AND-FORTH CODES
+		// for (var r=0; r<100; r++) {
+		// 	console.putmsg('\033[1C\033[1D', mode=P_NOPAUSE );
+		// }
+
+
  		// Update DrawTimes queue
  		drawTimes.push({'b':beginFrameDraw, 'e': endFrameDraw, 't': drawTime});
  		if (drawTimes.length > 5) { drawTimes.shift(); }
@@ -676,70 +821,11 @@ function play() {
 			msgFrame.putmsg('FPS: ' + fps.toFixed(1) + ' | DrawTime: ' + drawTime.toFixed(3) );
 		}
 
-
+		// When measured on 2025-11-07, the animation was mostly between 10-12 FPS, with a few dips down to 8 or 9.
 
 	} // end for loop
 
 
-	// ============================
-	// END CREDITS SCREEN ANIMATION
-	// ============================
-
-	var colors = [ highBlack, lowCyan, highCyan ];
-	var titles = [ 'For', 'Directed by'  ];
-	var names = [ 'RON', 'KIRKMAN' ];
-
-	bgFrame1.close();
-	bgFrame2.close();
-	bgFrame3.close();
-	bgFrame1.delete();
-	bgFrame2.delete();
-	bgFrame3.delete();
-	falconSprite.frame.close();
-	falconSprite.frame.delete();
-
-	for (var t=0; t<titles.length; t++) {
-		for (var c=0; c<colors.length; c++) {
-			fgFrame.gotoxy(0,11);
-			fgFrame.center( colors[c] + titles[t] );
-			fgFrame.crlf();
-			fgFrame.center( colors[c] + names[t] );
-			fgFrame.crlf();
-			repaintCanvas( bgFrame, canvasFrame );
-			canvasFrame.cycle();
-			mswait(80);
-// 			for (var r=0; r<100; r++) {
-// 				console.putmsg('\033[1C\033[1D', mode=P_NOPAUSE );
-// 			}
-			// fgFrame.gotoxy(0,1);
-			// fgFrame.center( delayHalfSec );
-		}
-// 		for (var r=0; r<2000; r++) {
-// 			console.putmsg('\033[1C\033[1D', mode=P_NOPAUSE );
-// 		}
-		// fgFrame.gotoxy(0,1);
-		// fgFrame.center( delayTwoSecs );
-		mswait(2000);
-		for (var c=colors.length-1; c>-1; c--) {
-			fgFrame.gotoxy(0,11);
-			fgFrame.center( colors[c] + titles[t] );
-			fgFrame.crlf();
-			fgFrame.center( colors[c] + names[t] );
-			fgFrame.crlf();
-			repaintCanvas( bgFrame, canvasFrame );
-			canvasFrame.cycle();
-			if (screenShot) {
-				var ssStr = ss.toString().rjust(3,'0');
-				bgFrame.screenShot(js.exec_dir + "/screenshots/milfalcon-" + ssStr + ".bin", false);
-				ss++;
-			}
-			mswait(80);
-// 			for (var r=0; r<100; r++) {
-// 				console.putmsg('\033[1C\033[1D', mode=P_NOPAUSE );
-// 			}
-		}
-
-	}
 } // play()
 
 

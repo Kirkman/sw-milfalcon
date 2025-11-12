@@ -90,7 +90,7 @@
 		{ "point": [82,-4], "comment": null },
 		{ "point": [82,-4], "comment": null },
 		{ "point": [82,-4], "comment": null },
-		{ "point": [80,4], "comment": "BEGIN MOVE" },
+		{ "point": [80,-4], "comment": "BEGIN MOVE" },
 		{ "point": [76,-4], "comment": null },
 		{ "point": [72,-4], "comment": null },
 		{ "point": [68,-4], "comment": null },
